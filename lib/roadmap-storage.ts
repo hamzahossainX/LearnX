@@ -32,13 +32,10 @@ export type RecoverableRoadmap = {
   milestones: RecoverableMilestone[];
 };
 
-export type RoadmapSource = "server" | "shared" | "demo";
-
 type StoredRoadmapEnvelope = {
   version: typeof STORAGE_VERSION;
   savedAt: number;
   roadmap: RecoverableRoadmap;
-  source?: RoadmapSource;
 };
 
 type ServerRoadmap = Omit<RecoverableRoadmap, "updatedAt"> & {
@@ -117,28 +114,7 @@ function isStoredRoadmapEnvelope(value: unknown): value is StoredRoadmapEnvelope
     return false;
   }
 
-  return (value.source === undefined || value.source === "server" || value.source === "shared" || value.source === "demo")
-    && isRecoverableRoadmap(value.roadmap);
-}
-
-/** Read the latest valid snapshot without requiring a server roadmap first. */
-export function readLatestRoadmapSnapshot(): RecoverableRoadmap | null {
-  return readLatestRoadmapEntry()?.roadmap ?? null;
-}
-
-export function readLatestRoadmapEntry(): { roadmap: RecoverableRoadmap; source?: RoadmapSource } | null {
-  try {
-    const rawSnapshot = window.localStorage.getItem(ACTIVE_ROADMAP_STORAGE_KEY);
-    if (!rawSnapshot) return null;
-
-    const storedValue: unknown = JSON.parse(rawSnapshot);
-    return isStoredRoadmapEnvelope(storedValue)
-      ? { roadmap: storedValue.roadmap, source: storedValue.source }
-      : null;
-  } catch {
-    // Missing browser storage, invalid JSON, or denied storage must not block the page.
-    return null;
-  }
+  return isRecoverableRoadmap(value.roadmap);
 }
 
 export function createRoadmapSnapshot(roadmap: ServerRoadmap): RecoverableRoadmap {
@@ -195,13 +171,12 @@ export function restoreRoadmapSnapshot(serverRoadmap: RecoverableRoadmap) {
   }
 }
 
-export function persistRoadmapSnapshot(roadmap: RecoverableRoadmap, source?: RoadmapSource) {
+export function persistRoadmapSnapshot(roadmap: RecoverableRoadmap) {
   try {
     const envelope: StoredRoadmapEnvelope = {
       version: STORAGE_VERSION,
       savedAt: Date.now(),
       roadmap,
-      source,
     };
     window.localStorage.setItem(ACTIVE_ROADMAP_STORAGE_KEY, JSON.stringify(envelope));
     return true;

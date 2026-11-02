@@ -11,7 +11,7 @@ const roadmapIdSchema = z.string().uuid();
 const userNameSchema = z.string().trim().min(2, "Enter your full name.").max(100, "Name must be 100 characters or fewer.");
 
 export async function claimCertificate(roadmapId: string, userName: string) {
-  await requireSignedInEmail();
+  const email = await requireSignedInEmail();
   const id = roadmapIdSchema.parse(roadmapId);
   const name = userNameSchema.parse(userName);
 
@@ -20,6 +20,7 @@ export async function claimCertificate(roadmapId: string, userName: string) {
     update ai_roadmaps as roadmap
     set user_name = ${name}, updated_at = now()
     where roadmap.id = ${id}::uuid
+      and (roadmap.user_id is null or roadmap.user_id = (select id from users where email = ${email}))
       and exists (
         select 1 from roadmap_milestones
         where roadmap_id = roadmap.id
@@ -35,5 +36,6 @@ export async function claimCertificate(roadmapId: string, userName: string) {
 
   revalidatePath(`/roadmap/${id}`);
   revalidatePath(`/certificate/${id}`);
+  revalidatePath("/student");
   redirect(`/certificate/${id}`);
 }

@@ -76,7 +76,7 @@ The roadmap flow uses two tables:
 - `ai_roadmaps` stores the prompt, generated title, description, and estimated duration.
 - `roadmap_milestones` stores ordered steps, resource links, completion state, and completion time. Resource links are typed JSONB objects with a title and HTTPS URL.
 
-Deleting a roadmap deletes its milestones through the database foreign key. The roadmap still has no user foreign key, so a roadmap is not owned by the learner who generated it. Generation and every mutation now require a session, but ownership checks need that column before they can be added.
+Deleting a roadmap deletes its milestones through the database foreign key. Newly generated roadmaps reference their creator through `ai_roadmaps.user_id`. The authenticated `/student` page (My Learning in the account menu) lists only that account's roadmaps, with server-saved milestone progress, a next-step suggestion, and pagination. Apply migration `0012_slimy_human_robot` before running this version. Historical roadmaps have a null owner and are deliberately not assigned to any account.
 
 Per-learner generation usage lives on `users` as `daily_generation_count` and `last_generation_date`.
 
@@ -259,13 +259,17 @@ bypass the cap.
 Roadmaps are public by UUID, and possession of the URL grants read access.
 
 Every Server Action requires a session, because a Server Action is a public
-HTTP endpoint whether or not the UI calls it. What is **not** yet enforced is
-ownership: `ai_roadmaps` has no user column, so any signed-in learner who knows
-a roadmap UUID can toggle its milestones or claim its certificate.
+HTTP endpoint whether or not the UI calls it. For account-owned roadmaps, milestone
+completion and certificate claims require the creator's account. My Learning is
+session-protected and filters ownership on the server; it never accepts a user ID
+from the browser. Legacy roadmaps with a null owner retain their existing signed-in
+mutation behavior. Public UUID links and encoded shared snapshots remain readable;
+this feature does not make roadmaps private. AI helper actions still require a session
+but are not all restricted to the owner.
 
 Before using LearnX for private or multi-user data:
 
-- add a user column to `ai_roadmaps` and check ownership inside every mutation;
+- decide whether public reads and legacy-roadmap edits should remain available, and extend ownership checks to AI helper mutations if private workspaces are required;
 - validate upload type and size if Cloudinary uploads are enabled;
 - rotate any credential that has been copied into logs, chat, or source control.
 

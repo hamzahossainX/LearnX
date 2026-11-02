@@ -265,7 +265,7 @@ export async function generateRoadmap(
 
   // A live session whose account row is gone cannot be metered, so it is
   // treated as signed out rather than handed an unmetered generation.
-  if (!signedInUser && !isAdmin) {
+  if (!signedInUser) {
     return { success: false, error: AUTH_REQUIRED_ERROR, authRequiredAt: Date.now() };
   }
 
@@ -573,8 +573,8 @@ You must respond with one valid JSON object and nothing else. Never wrap the JSO
     const result = isAdvanced
       ? await db.execute<{ id: string }>(sql`
           with new_roadmap as (
-            insert into ai_roadmaps (prompt, title, description, estimated_duration)
-            values (${prompt}, ${roadmap.title}, ${roadmap.description}, ${roadmap.estimatedDuration})
+            insert into ai_roadmaps (user_id, prompt, title, description, estimated_duration)
+            values (${signedInUser.id}::uuid, ${prompt}, ${roadmap.title}, ${roadmap.description}, ${roadmap.estimatedDuration})
             returning id
           ), new_milestones as (
             insert into roadmap_milestones (roadmap_id, title, description, duration, resource_links, exhaustive_deep_dive, position)
@@ -587,8 +587,8 @@ You must respond with one valid JSON object and nothing else. Never wrap the JSO
         `)
       : await db.execute<{ id: string }>(sql`
           with new_roadmap as (
-            insert into ai_roadmaps (prompt, title, description, estimated_duration)
-            values (${prompt}, ${roadmap.title}, ${roadmap.description}, ${roadmap.estimatedDuration})
+            insert into ai_roadmaps (user_id, prompt, title, description, estimated_duration)
+            values (${signedInUser.id}::uuid, ${prompt}, ${roadmap.title}, ${roadmap.description}, ${roadmap.estimatedDuration})
             returning id
           ), new_milestones as (
             insert into roadmap_milestones (roadmap_id, title, description, duration, resource_links, position)
@@ -620,6 +620,7 @@ You must respond with one valid JSON object and nothing else. Never wrap the JSO
   }
 
   revalidatePath(`/roadmap/${createdRoadmapId}`);
+  revalidatePath("/student");
   const redirectParams = new URLSearchParams(createCareerInsightsQuery(createdCareerInsights));
   appendMindMapQuery(redirectParams, createdMermaidSyntax);
   redirect(`/roadmap/${createdRoadmapId}?${redirectParams.toString()}`);

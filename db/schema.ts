@@ -4,6 +4,7 @@ import {
   boolean,
   date,
   integer,
+  index,
   jsonb,
   pgEnum,
   pgTable,
@@ -108,6 +109,7 @@ export const resumes = pgTable("resumes", {
 
 export const aiRoadmaps = pgTable("ai_roadmaps", {
   id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   userName: text("user_name"),
   prompt: text("prompt").notNull(),
   title: text("title").notNull(),
@@ -115,7 +117,7 @@ export const aiRoadmaps = pgTable("ai_roadmaps", {
   estimatedDuration: text("estimated_duration").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [index("ai_roadmaps_user_updated_idx").on(table.userId, table.updatedAt)]);
 
 export const guestUsage = pgTable("guest_usage", {
   id: uuid("id").defaultRandom().primaryKey(),

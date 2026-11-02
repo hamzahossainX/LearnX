@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+test("My Learning redirects signed-out visitors to login", async ({ page }) => {
+  await page.goto("/student");
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 test("landing page exposes the builder and command palette", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Turn ambition into/i })).toBeVisible();

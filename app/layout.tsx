@@ -7,6 +7,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "LearnX — Your AI Learning Roadmap",
   description: "Turn verified learning into career-ready proof.",
+  applicationName: "LearnX",
+  keywords: ["AI learning roadmap", "personalized learning", "career skills"],
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

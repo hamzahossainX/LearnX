@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 export const START_TOUR_EVENT = "learnx:start-tour";
 const AUTO_CONTINUE_SESSION_KEY = "learnx:tour-auto-continue";
 const TOUR_SEEN_STORAGE_KEY = "learnx:judge-tour-seen:v1";
-const STEP_AUTO_ADVANCE_MS = 8500;
+const STEP_AUTO_ADVANCE_MS = 4200;
 
 export type TourStep = {
   selector: string;
@@ -108,7 +108,7 @@ export function GuidedTourLauncher() {
       type="button"
       onClick={() => window.dispatchEvent(new Event(START_TOUR_EVENT))}
       aria-label="Start judge tour"
-      title="Start 60-second judge tour (Press Shift+T)"
+      title="Start judge tour (Press Shift+T)"
       className="group relative inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[#3c7156]/25 bg-gradient-to-r from-[#f0f7e7] to-[#e8f4dc] px-3.5 text-xs font-black text-[#17211b] shadow-[0_2px_8px_rgba(60,113,86,0.08)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#3c7156]/50 hover:bg-[#e4f1d4] hover:shadow-[0_4px_16px_rgba(60,113,86,0.18)] dark:border-[#c8ff65]/25 dark:bg-gradient-to-r dark:from-[#c8ff65]/10 dark:to-[#c8ff65]/5 dark:text-[#c8ff65] dark:hover:border-[#c8ff65]/50 dark:hover:bg-[#c8ff65]/15"
     >
       <span className="relative flex size-2 items-center justify-center">
@@ -117,9 +117,6 @@ export function GuidedTourLauncher() {
       </span>
       <Sparkles className="size-3.5 text-[#3c7156] transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110 dark:text-[#c8ff65]" />
       <span className="tracking-tight">Judge Tour</span>
-      <span className="hidden rounded-full bg-[#17211b]/10 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-[#17211b] dark:bg-[#c8ff65]/20 dark:text-[#c8ff65] sm:inline">
-        60s
-      </span>
     </button>
   );
 }
@@ -196,9 +193,13 @@ export function GuidedTour() {
     try {
       if (window.sessionStorage.getItem(AUTO_CONTINUE_SESSION_KEY) === "true") {
         window.sessionStorage.removeItem(AUTO_CONTINUE_SESSION_KEY);
-        // Delay slightly for DOM to settle
+        const shouldResumeAutoPlay = window.sessionStorage.getItem("learnx:tour-auto-play") === "true";
+        window.sessionStorage.removeItem("learnx:tour-auto-play");
         const timer = window.setTimeout(() => {
           refreshSteps();
+          if (shouldResumeAutoPlay) {
+            setAutoPlay(true);
+          }
         }, 500);
         return () => window.clearTimeout(timer);
       }
@@ -277,13 +278,34 @@ export function GuidedTour() {
     return () => window.removeEventListener("keydown", handleKeydown);
   }, [close, isLast, open, steps.length]);
 
-  // Auto-play timer implementation
+  // Action: Launch Demo Roadmap directly from tour
+  const handleLaunchDemo = useCallback(async () => {
+    if (isNavigatingDemo) return;
+    setIsNavigatingDemo(true);
+    try {
+      window.sessionStorage.setItem(AUTO_CONTINUE_SESSION_KEY, "true");
+      if (autoPlay) {
+        window.sessionStorage.setItem("learnx:tour-auto-play", "true");
+      }
+      const encodedRoadmap = await encodeRoadmapForUrl(DEMO_ROADMAP, { compress: false });
+      router.push(`/roadmap/demo?roadmap=${encodeURIComponent(encodedRoadmap)}`);
+      close();
+    } catch {
+      setIsNavigatingDemo(false);
+    }
+  }, [autoPlay, close, isNavigatingDemo, router]);
+
+  // Auto-play timer implementation (advances smoothly every 4.2 seconds)
   useEffect(() => {
     if (!open || !autoPlay) return;
 
     const timer = window.setTimeout(() => {
       if (isLast) {
-        close();
+        if (activeStep?.isDemoTrigger) {
+          void handleLaunchDemo();
+        } else {
+          close();
+        }
       } else {
         setStepIndex((index) => index + 1);
         setProgressKey((k) => k + 1);
@@ -291,21 +313,7 @@ export function GuidedTour() {
     }, STEP_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [autoPlay, close, isLast, open, progressKey, stepIndex]);
-
-  // Action: Launch Demo Roadmap directly from tour
-  const handleLaunchDemo = useCallback(async () => {
-    if (isNavigatingDemo) return;
-    setIsNavigatingDemo(true);
-    try {
-      window.sessionStorage.setItem(AUTO_CONTINUE_SESSION_KEY, "true");
-      const encodedRoadmap = await encodeRoadmapForUrl(DEMO_ROADMAP, { compress: false });
-      router.push(`/roadmap/demo?roadmap=${encodeURIComponent(encodedRoadmap)}`);
-      close();
-    } catch {
-      setIsNavigatingDemo(false);
-    }
-  }, [close, isNavigatingDemo, router]);
+  }, [activeStep?.isDemoTrigger, autoPlay, close, handleLaunchDemo, isLast, open, progressKey, stepIndex]);
 
   if (!activeStep) return null;
 
@@ -428,18 +436,21 @@ export function GuidedTour() {
               {/* Auto-Play Toggle */}
               <button
                 type="button"
-                onClick={() => setAutoPlay((prev) => !prev)}
-                aria-label={autoPlay ? "Pause auto-tour" : "Play auto-tour (60s)"}
-                title={autoPlay ? "Pause auto-tour" : "Play auto-tour (60s)"}
+                onClick={() => {
+                  setAutoPlay((prev) => !prev);
+                  setProgressKey((k) => k + 1);
+                }}
+                aria-label={autoPlay ? "Pause auto-tour" : "Play auto-tour"}
+                title={autoPlay ? "Pause auto-tour" : "Play auto-tour"}
                 className={cn(
                   "inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold uppercase tracking-wider transition-all",
                   autoPlay
-                    ? "border-[#c8ff65]/40 bg-[#c8ff65]/20 text-[#c8ff65]"
+                    ? "border-[#c8ff65] bg-[#c8ff65]/20 text-[#c8ff65] shadow-[0_0_12px_rgba(200,255,101,0.25)]"
                     : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white",
                 )}
               >
-                {autoPlay ? <Pause className="size-3" /> : <Play className="size-3" />}
-                <span className="hidden min-[380px]:inline">{autoPlay ? "Playing" : "Auto"}</span>
+                {autoPlay ? <Pause className="size-3 text-[#c8ff65]" /> : <Play className="size-3" />}
+                <span>{autoPlay ? "Auto: On" : "Auto"}</span>
               </button>
 
               {/* Close Button */}
@@ -458,39 +469,45 @@ export function GuidedTour() {
 
           {/* Interactive Step Progress Segments */}
           <div className="relative mb-4 flex gap-1.5" role="tablist" aria-label="Tour steps">
-            {steps.map((step, idx) => (
-              <button
-                key={step.selector}
-                type="button"
-                role="tab"
-                aria-selected={idx === stepIndex}
-                aria-label={`Jump to step ${idx + 1}: ${step.title}`}
-                title={`Step ${idx + 1}: ${step.title}`}
-                onClick={() => {
-                  setAutoPlay(false);
-                  setStepIndex(idx);
-                  setProgressKey((k) => k + 1);
-                }}
-                className={cn(
-                  "relative h-1.5 flex-1 overflow-hidden rounded-full transition-all duration-300",
-                  idx === stepIndex
-                    ? "bg-[#c8ff65]"
-                    : idx < stepIndex
-                      ? "bg-[#c8ff65]/50 hover:bg-[#c8ff65]/80"
-                      : "bg-white/15 hover:bg-white/30",
-                )}
-              >
-                {autoPlay && idx === stepIndex && (
-                  <motion.div
-                    key={`bar-${progressKey}`}
-                    initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: STEP_AUTO_ADVANCE_MS / 1000, ease: "linear" }}
-                    className="h-full bg-white/90"
-                  />
-                )}
-              </button>
-            ))}
+            {steps.map((step, idx) => {
+              const isCurrent = idx === stepIndex;
+              const isPassed = idx < stepIndex;
+
+              return (
+                <button
+                  key={step.selector}
+                  type="button"
+                  role="tab"
+                  aria-selected={isCurrent}
+                  aria-label={`Jump to step ${idx + 1}: ${step.title}`}
+                  title={`Step ${idx + 1}: ${step.title}`}
+                  onClick={() => {
+                    setStepIndex(idx);
+                    setProgressKey((k) => k + 1);
+                  }}
+                  className={cn(
+                    "relative h-2 flex-1 overflow-hidden rounded-full transition-all duration-200",
+                    isPassed
+                      ? "bg-[#c8ff65]"
+                      : isCurrent
+                        ? autoPlay
+                          ? "bg-white/20 ring-1 ring-[#c8ff65]/50"
+                          : "bg-[#c8ff65]"
+                        : "bg-white/15 hover:bg-white/30",
+                  )}
+                >
+                  {isCurrent && autoPlay && (
+                    <motion.div
+                      key={`bar-${stepIndex}-${progressKey}`}
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: STEP_AUTO_ADVANCE_MS / 1000, ease: "linear" }}
+                      className="h-full bg-[#c8ff65]"
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Title & Description */}

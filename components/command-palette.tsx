@@ -81,7 +81,7 @@ export function CommandPalette() {
       },
       {
         id: "judge-tour",
-        label: "Start 60-second judge tour",
+        label: "Start judge tour",
         hint: "Take an interactive walkthrough of LearnX features",
         icon: Sparkles,
         run: () => window.dispatchEvent(new Event(START_TOUR_EVENT)),

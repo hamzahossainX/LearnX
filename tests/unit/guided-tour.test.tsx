@@ -35,7 +35,7 @@ describe("Guided Tour", () => {
 
     const launcher = screen.getByRole("button", { name: "Start judge tour" });
     expect(launcher).toBeInTheDocument();
-    expect(launcher).toHaveAttribute("title", expect.stringContaining("60-second judge tour"));
+    expect(launcher).toHaveAttribute("title", expect.stringContaining("judge tour"));
 
     fireEvent.click(launcher);
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: START_TOUR_EVENT }));

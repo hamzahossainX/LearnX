@@ -41,6 +41,7 @@ function addLocalDays(date: Date, amount: number) {
 }
 
 export function readStudyActivity(): StudyActivityEvent[] {
+  if (typeof window === "undefined") return [];
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]");
     if (!Array.isArray(parsed)) return [];
@@ -51,6 +52,7 @@ export function readStudyActivity(): StudyActivityEvent[] {
 }
 
 export function saveStudyActivity(events: StudyActivityEvent[]) {
+  if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events.slice(-MAX_EVENTS)));
     return true;

@@ -236,6 +236,20 @@ function createRoadmapJsonSchema(isAdvanced: boolean) {
   } as const;
 }
 
+function extractJsonEnvelope(content: string): string {
+  const withoutFence = content
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  const objStart = withoutFence.indexOf("{");
+  const objEnd = withoutFence.lastIndexOf("}");
+  if (objStart >= 0 && objEnd > objStart) {
+    return withoutFence.slice(objStart, objEnd + 1);
+  }
+  return withoutFence;
+}
+
 export async function generateRoadmap(
   _previousState: GenerateRoadmapState,
   formData: FormData,
@@ -341,9 +355,11 @@ You must respond with one valid JSON object and nothing else. Never wrap the JSO
   function parseAndValidateRoadmap(rawContent: string, provider: string) {
     if (!rawContent.trim()) throw new Error(`${provider} returned an empty roadmap response.`);
 
+    const sanitizedContent = extractJsonEnvelope(rawContent);
+
     let parsedContent: unknown;
     try {
-      parsedContent = JSON.parse(rawContent);
+      parsedContent = JSON.parse(sanitizedContent);
     } catch (parseError) {
       throw new IncompleteRoadmapGenerationError(
         `${provider} returned malformed or truncated JSON.`,
@@ -475,8 +491,8 @@ You must respond with one valid JSON object and nothing else. Never wrap the JSO
     const seenGroqKeys = new Set<string>();
     let aiResponse: ReturnType<typeof parseAndValidateRoadmap> | undefined;
     const groqTiers = [
-      { provider: "Groq tier 1", apiKey: process.env.GROQ_API_KEY_1 },
-      { provider: "Groq tier 2", apiKey: process.env.GROQ_API_KEY_2 },
+      { provider: "Groq tier 1", apiKey: process.env.GROQ_API_KEY_1 ?? process.env.GROQ_API_KEY },
+      { provider: "Groq tier 2", apiKey: process.env.GROQ_API_KEY_2 ?? process.env.GROQ_BACKUP_API_KEY },
       { provider: "Groq tier 3", apiKey: process.env.GROQ_API_KEY_3 },
     ] as const;
 

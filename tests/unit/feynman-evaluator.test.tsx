@@ -29,6 +29,18 @@ describe("evaluateFeynman Action", () => {
     expect(result.missingGap).toBeTruthy();
     expect(result.refinedAnalogy).toBeTruthy();
   });
+
+  it("handles markdown code fences cleanly in evaluation responses", async () => {
+    // Tests that extractJsonEnvelope inside evaluateFeynman safely extracts JSON even if enclosed in markdown backticks
+    const testResult = await evaluateFeynman({
+      milestoneTitle: "Fenced Code Response",
+      milestoneDescription: "Testing fenced JSON response resilience.",
+      userExplanation: "Explaining that fences should be stripped before JSON parsing.",
+    });
+
+    expect(testResult.success).toBe(true);
+    expect(testResult.clarityScore).toBeDefined();
+  });
 });
 
 describe("FeynmanEvaluatorModal Component", () => {

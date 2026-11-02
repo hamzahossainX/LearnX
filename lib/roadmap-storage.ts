@@ -145,6 +145,7 @@ export function createRoadmapSnapshot(roadmap: ServerRoadmap): RecoverableRoadma
 }
 
 export function restoreRoadmapSnapshot(serverRoadmap: RecoverableRoadmap) {
+  if (typeof window === "undefined") return serverRoadmap;
   try {
     const rawSnapshot = window.localStorage.getItem(ACTIVE_ROADMAP_STORAGE_KEY);
     if (!rawSnapshot) return serverRoadmap;
@@ -172,6 +173,7 @@ export function restoreRoadmapSnapshot(serverRoadmap: RecoverableRoadmap) {
 }
 
 export function persistRoadmapSnapshot(roadmap: RecoverableRoadmap) {
+  if (typeof window === "undefined") return false;
   try {
     const envelope: StoredRoadmapEnvelope = {
       version: STORAGE_VERSION,

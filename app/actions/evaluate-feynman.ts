@@ -30,6 +30,20 @@ const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
 const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 const API_TIMEOUT_MS = 12_000;
 
+function extractJsonEnvelope(content: string): string {
+  const withoutFence = content
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  const objStart = withoutFence.indexOf("{");
+  const objEnd = withoutFence.lastIndexOf("}");
+  if (objStart >= 0 && objEnd > objStart) {
+    return withoutFence.slice(objStart, objEnd + 1);
+  }
+  return withoutFence;
+}
+
 function getDeterministicFallback(milestoneTitle: string): FeynmanEvaluationResult {
   return {
     success: true,
@@ -84,7 +98,8 @@ export async function evaluateFeynman(
     const content = completion.choices[0]?.message.content ?? "";
     if (!content.trim()) throw new Error(`${providerName} returned empty content.`);
 
-    const parsed = JSON.parse(content);
+    const sanitized = extractJsonEnvelope(content);
+    const parsed = JSON.parse(sanitized);
     return feynmanResponseSchema.parse(parsed);
   }
 
@@ -125,14 +140,15 @@ export async function evaluateFeynman(
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     if (!rawText.trim()) throw new Error("Gemini returned empty parts.");
 
-    const parsed = JSON.parse(rawText);
+    const sanitized = extractJsonEnvelope(rawText);
+    const parsed = JSON.parse(sanitized);
     return feynmanResponseSchema.parse(parsed);
   }
 
   // 4-tier fallback: GROQ_API_KEY_1 -> GROQ_API_KEY_2 -> GROQ_API_KEY_3 -> GEMINI_API_KEY
   const groqKeys = [
-    { name: "Groq tier 1", key: process.env.GROQ_API_KEY_1 },
-    { name: "Groq tier 2", key: process.env.GROQ_API_KEY_2 },
+    { name: "Groq tier 1", key: process.env.GROQ_API_KEY_1 ?? process.env.GROQ_API_KEY },
+    { name: "Groq tier 2", key: process.env.GROQ_API_KEY_2 ?? process.env.GROQ_BACKUP_API_KEY },
     { name: "Groq tier 3", key: process.env.GROQ_API_KEY_3 },
   ];
 

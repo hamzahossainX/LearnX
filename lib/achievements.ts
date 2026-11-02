@@ -30,6 +30,7 @@ const STORAGE_KEY = "learnx:achievements:v1";
 const ACHIEVEMENT_IDS = new Set<AchievementId>(ACHIEVEMENTS.map((item) => item.id));
 
 export function readAchievements(): UnlockedAchievement[] {
+  if (typeof window === "undefined") return [];
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]");
     if (!Array.isArray(parsed)) return [];
@@ -50,6 +51,7 @@ export function readAchievements(): UnlockedAchievement[] {
 }
 
 export function persistAchievements(achievements: UnlockedAchievement[]) {
+  if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(achievements));
     return true;

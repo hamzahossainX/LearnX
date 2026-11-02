@@ -200,22 +200,24 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
   useEffect(() => {
     setAchievements(readAchievements());
     setStudyActivity(readStudyActivity());
-    try {
-      const raw = localStorage.getItem("learnx_feynman_scores");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const scores: Record<string, number> = {};
-        for (const [key, val] of Object.entries(parsed)) {
-          if (typeof val === "object" && val !== null && "score" in val) {
-            scores[key] = Number((val as { score: number }).score);
-          } else if (typeof val === "number") {
-            scores[key] = val;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("learnx_feynman_scores");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const scores: Record<string, number> = {};
+          for (const [key, val] of Object.entries(parsed)) {
+            if (typeof val === "object" && val !== null && "score" in val) {
+              scores[key] = Number((val as { score: number }).score);
+            } else if (typeof val === "number") {
+              scores[key] = val;
+            }
           }
+          setFeynmanScores(scores);
         }
-        setFeynmanScores(scores);
+      } catch {
+        // Ignore localStorage parse errors
       }
-    } catch {
-      // Ignore localStorage parse errors
     }
   }, []);
 
@@ -381,6 +383,7 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
             totalMilestones={milestones.length}
             completedMilestoneIndices={completedMilestonePositions}
             securityFocus={hasSecurityFocus}
+            speedrunMode={Boolean(zenMilestone)}
           />
         </div>
         <div className="mb-5 flex flex-col gap-4 sm:mb-7 sm:flex-row sm:items-center sm:justify-between">
@@ -403,32 +406,35 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold text-black/45 dark:bg-white/8 dark:text-white/45">{item.duration}</span>
                     <button type="button" onClick={(event) => { event.stopPropagation(); setZenMilestone(item); }} className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#3c7156]/15 bg-[#f0f7e7] px-3 py-1 text-xs font-black text-[#28583f] transition hover:-translate-y-0.5 hover:border-[#3c7156]/35 dark:border-[#c8ff65]/20 dark:bg-[#c8ff65]/10 dark:text-[#c8ff65] dark:hover:border-[#c8ff65]/40" aria-label={`Start a focus session for ${item.title}`}><Timer size={13} /> Focus</button>
-                    {feynmanScores[item.id] !== undefined && feynmanScores[item.id] >= 70 ? (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setFeynmanMilestone(item);
-                        }}
-                        className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#b5f23d]/40 bg-[#b5f23d]/15 px-3 py-1 text-xs font-bold text-[#28583f] transition hover:-translate-y-0.5 hover:border-[#b5f23d]/60 dark:text-[#b5f23d]"
-                        aria-label={`Verified: ${feynmanScores[item.id]}% Clarity for ${item.title}`}
-                      >
-                        <Check className="size-3 text-[#28583f] dark:text-[#b5f23d]" strokeWidth={3} />
-                        <span>Verified: {feynmanScores[item.id]}% Clarity</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setFeynmanMilestone(item);
-                        }}
-                        className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#b5f23d]/30 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-[#28583f] transition-all hover:bg-[#b5f23d]/15 dark:text-[#b5f23d]"
-                        aria-label={`Feynman technique check for ${item.title}`}
-                      >
-                        <span role="img" aria-label="brain">🧠</span> Feynman Check
-                      </button>
-                    )}
+                    {(() => {
+                      const score = feynmanScores[item.id] ?? feynmanScores[item.title];
+                      return score !== undefined && score >= 70 ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFeynmanMilestone(item);
+                          }}
+                          className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#b5f23d]/40 bg-[#b5f23d]/15 px-3 py-1 text-xs font-bold text-[#28583f] transition hover:-translate-y-0.5 hover:border-[#b5f23d]/60 dark:text-[#b5f23d]"
+                          aria-label={`Verified: ${score}% Clarity for ${item.title}`}
+                        >
+                          <Check className="size-3 text-[#28583f] dark:text-[#b5f23d]" strokeWidth={3} />
+                          <span>Verified: {score}% Clarity</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFeynmanMilestone(item);
+                          }}
+                          className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#b5f23d]/30 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-[#28583f] transition-all hover:bg-[#b5f23d]/15 dark:text-[#b5f23d]"
+                          aria-label={`Feynman technique check for ${item.title}`}
+                        >
+                          <span role="img" aria-label="brain">🧠</span> Feynman Check
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
                 <p className="mt-2 break-words text-sm leading-6 text-black/50 dark:text-white/55">{item.description}</p>
@@ -541,12 +547,16 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
       />
       <FeynmanEvaluatorModal
         milestone={feynmanMilestone}
-        existingScore={feynmanMilestone ? feynmanScores[feynmanMilestone.id] : undefined}
+        existingScore={feynmanMilestone ? (feynmanScores[feynmanMilestone.id] ?? feynmanScores[feynmanMilestone.title]) : undefined}
         onOpenChange={(open) => {
           if (!open) setFeynmanMilestone(null);
         }}
         onVerified={(milestoneId, score) => {
-          setFeynmanScores((prev) => ({ ...prev, [milestoneId]: score }));
+          setFeynmanScores((prev) => ({
+            ...prev,
+            [milestoneId]: score,
+            ...(feynmanMilestone ? { [feynmanMilestone.title]: score } : {}),
+          }));
         }}
       />
     </section>

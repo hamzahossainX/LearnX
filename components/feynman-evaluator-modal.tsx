@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Brain,
   CheckCircle2,
@@ -25,28 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { cn } from "@/lib/utils";
-
-interface SpeechRecognitionEventLike {
-  results: {
-    [index: number]: {
-      [index: number]: {
-        transcript: string;
-      };
-    };
-  };
-}
-
-interface SpeechRecognitionLike {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: unknown) => void) | null;
-  onend: (() => void) | null;
-}
 
 type FeynmanMilestone = {
   id: string;
@@ -72,69 +52,23 @@ export function FeynmanEvaluatorModal({
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<FeynmanEvaluationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isListening, setIsListening] = useState(false);
-  const [hasSpeechSupport, setHasSpeechSupport] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
-  // Initialize Speech Recognition availability
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognitionClass = (window as unknown as {
-        SpeechRecognition?: { new (): SpeechRecognitionLike };
-        webkitSpeechRecognition?: { new (): SpeechRecognitionLike };
-      }).SpeechRecognition ?? (window as unknown as {
-        webkitSpeechRecognition?: { new (): SpeechRecognitionLike };
-      }).webkitSpeechRecognition;
-
-      if (SpeechRecognitionClass) {
-        setHasSpeechSupport(true);
-        try {
-          const instance = new SpeechRecognitionClass();
-          instance.continuous = true;
-          instance.interimResults = true;
-          instance.lang = "en-US";
-
-          instance.onresult = (event: SpeechRecognitionEventLike) => {
-            let fullTranscript = "";
-            for (let i = 0; i < Object.keys(event.results).length; i++) {
-              const res = event.results[i];
-              if (res && res[0]) {
-                fullTranscript += res[0].transcript + " ";
-              }
-            }
-            if (fullTranscript.trim()) {
-              setUserExplanation((prev) => {
-                const trimmed = prev.trim();
-                return trimmed ? `${trimmed} ${fullTranscript.trim()}` : fullTranscript.trim();
-              });
-            }
-          };
-
-          instance.onerror = () => {
-            setIsListening(false);
-          };
-
-          instance.onend = () => {
-            setIsListening(false);
-          };
-
-          recognitionRef.current = instance;
-        } catch {
-          setHasSpeechSupport(false);
-        }
-      }
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {
-          // Cleanup silence
-        }
-      }
-    };
+  const handleVoiceTranscript = useCallback((transcript: string) => {
+    setUserExplanation((prev) => {
+      const trimmed = prev.trim();
+      return trimmed ? `${trimmed} ${transcript}` : transcript;
+    });
   }, []);
+
+  const handleVoiceError = useCallback((message: string) => {
+    toast.warning(message, { duration: 6_000 });
+  }, []);
+
+  const { isListening, isSupported, toggleListening } = useSpeechRecognition({
+    maxLength: 1200,
+    onTranscript: handleVoiceTranscript,
+    onError: handleVoiceError,
+  });
 
   // Reset modal state whenever the active milestone changes
   useEffect(() => {
@@ -143,37 +77,15 @@ export function FeynmanEvaluatorModal({
       setResult(null);
       setError(null);
       setIsLoading(false);
-      setIsListening(false);
     }
   }, [milestone]);
-
-  const toggleListening = useCallback(() => {
-    if (!recognitionRef.current) {
-      toast.info("Speech recognition is not supported in this browser.");
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-        toast.info("Listening... Speak your explanation clearly into the mic.");
-      } catch {
-        setIsListening(false);
-      }
-    }
-  }, [isListening]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!milestone) return;
 
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+    if (isListening) {
+      toggleListening();
     }
 
     const trimmed = userExplanation.trim();
@@ -201,19 +113,23 @@ export function FeynmanEvaluatorModal({
 
       const score = evaluation.clarityScore ?? 0;
       if (score >= 70) {
-        // Save to localStorage under learnx_feynman_scores
-        try {
-          const raw = localStorage.getItem("learnx_feynman_scores");
-          const scoresMap: Record<string, { score: number; verifiedAt: string }> = raw
-            ? JSON.parse(raw)
-            : {};
-          scoresMap[milestone.id] = {
-            score,
-            verifiedAt: new Date().toISOString(),
-          };
-          localStorage.setItem("learnx_feynman_scores", JSON.stringify(scoresMap));
-        } catch {
-          // Persistence fallback
+        // Save to localStorage under learnx_feynman_scores with SSR check
+        if (typeof window !== "undefined") {
+          try {
+            const raw = localStorage.getItem("learnx_feynman_scores");
+            const scoresMap: Record<string, { score: number; verifiedAt: string }> = raw
+              ? JSON.parse(raw)
+              : {};
+            const record = {
+              score,
+              verifiedAt: new Date().toISOString(),
+            };
+            scoresMap[milestone.id] = record;
+            scoresMap[milestone.title] = record;
+            localStorage.setItem("learnx_feynman_scores", JSON.stringify(scoresMap));
+          } catch {
+            // Persistence fallback
+          }
         }
 
         if (onVerified) {
@@ -312,8 +228,8 @@ export function FeynmanEvaluatorModal({
                       className="w-full resize-none rounded-xl border border-white/15 bg-black/40 p-4 pb-12 text-sm leading-relaxed text-white placeholder:text-zinc-500 focus:border-[#b5f23d] focus:outline-none focus:ring-1 focus:ring-[#b5f23d]"
                     />
 
-                    {/* Mic button for Web Speech API */}
-                    {hasSpeechSupport && (
+                    {/* Mic button for Web Speech API via useSpeechRecognition */}
+                    {isSupported !== false && (
                       <button
                         type="button"
                         onClick={toggleListening}

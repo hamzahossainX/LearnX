@@ -53,6 +53,7 @@ function getStorageKey(viewerKey: string) {
 
 function readDailyUsage(storageKey: string): DailyShareUsage {
   const today = localDateKey();
+  if (typeof window === "undefined") return { date: today, count: 0 };
   const saved = window.localStorage.getItem(storageKey);
   if (!saved) return { date: today, count: 0 };
 

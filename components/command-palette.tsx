@@ -25,6 +25,7 @@ import {
   type RoadmapView,
 } from "@/lib/roadmap-events";
 import { encodeRoadmapForUrl } from "@/lib/roadmap-sharing";
+import { START_TOUR_EVENT } from "@/components/tour/guided-tour";
 
 type PaletteAction = {
   id: string;
@@ -77,6 +78,13 @@ export function CommandPalette() {
           const encoded = await encodeRoadmapForUrl(DEMO_ROADMAP, { compress: false });
           router.push(`/roadmap/demo?roadmap=${encodeURIComponent(encoded)}`);
         },
+      },
+      {
+        id: "judge-tour",
+        label: "Start judge tour",
+        hint: "Take an interactive walkthrough of LearnX features",
+        icon: Sparkles,
+        run: () => window.dispatchEvent(new Event(START_TOUR_EVENT)),
       },
       {
         id: "theme",

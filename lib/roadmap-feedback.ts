@@ -26,6 +26,7 @@ function isFeedback(value: unknown): value is RoadmapFeedback {
 }
 
 export function readRoadmapFeedback(): RoadmapFeedback[] {
+  if (typeof window === "undefined") return [];
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]");
     return Array.isArray(parsed) ? parsed.filter(isFeedback).slice(-MAX_RECORDS) : [];
@@ -45,6 +46,7 @@ export function upsertRoadmapFeedback(
 }
 
 export function saveRoadmapFeedback(feedback: RoadmapFeedback[]) {
+  if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(feedback.slice(-MAX_RECORDS)));
     return true;

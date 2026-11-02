@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { motion } from "framer-motion";
-import { Baby, BadgeCheck, BookOpen, Check, ChevronRight, Clock3, Circle, ExternalLink, ListTree, LoaderCircle, Sparkles, Timer, Workflow } from "lucide-react";
+import { Baby, BadgeCheck, BookOpen, Brain, Check, ChevronRight, Clock3, Circle, ExternalLink, ListTree, LoaderCircle, Sparkles, Timer, Workflow } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import { simplifyMilestone } from "@/app/actions/simplify-milestone";
 import { toggleMilestone } from "@/app/actions/toggle-milestone";
 import { ClaimCertificateDialog } from "@/components/certificate/claim-certificate-dialog";
+import { SkillRadarChart } from "@/components/skill-radar-chart";
+import { FeynmanEvaluatorModal } from "@/components/feynman-evaluator-modal";
 import { AchievementGallery } from "@/components/roadmap/achievement-gallery";
 import { AdaptiveRoadmapDialog } from "@/components/roadmap/adaptive-roadmap-dialog";
 import { CareerInsightsWidget } from "@/components/roadmap/career-insights-widget";
@@ -114,6 +116,8 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
   const [activeMilestone, setActiveMilestone] = useState<TrackerMilestone | null>(null);
   const [zenMilestone, setZenMilestone] = useState<TrackerMilestone | null>(null);
   const [quizMilestone, setQuizMilestone] = useState<TrackerMilestone | null>(null);
+  const [feynmanMilestone, setFeynmanMilestone] = useState<TrackerMilestone | null>(null);
+  const [feynmanScores, setFeynmanScores] = useState<Record<string, number>>({});
   const [simplifyingMilestoneId, setSimplifyingMilestoneId] = useState<string | null>(null);
   const [eli5ByMilestone, setEli5ByMilestone] = useState<Record<string, string[]>>(() =>
     Object.fromEntries(
@@ -142,6 +146,19 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
   const mindMapSyntax = useMemo(
     () => roadmapState.mermaidSyntax ?? createMilestoneMindMap(roadmapState.title, milestones),
     [milestones, roadmapState.mermaidSyntax, roadmapState.title],
+  );
+  const completedMilestonePositions = useMemo(
+    () => milestones.filter((item) => item.isCompleted).map((item) => item.position),
+    [milestones],
+  );
+  const hasSecurityFocus = useMemo(
+    () =>
+      milestones.some(
+        (item) =>
+          item.description.includes("Security Note:") ||
+          Boolean(item.exhaustiveDeepDive?.includes("Security Note")),
+      ),
+    [milestones],
   );
   const unlockAchievement = useCallback((achievementId: AchievementId) => {
     const current = readAchievements();
@@ -183,6 +200,25 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
   useEffect(() => {
     setAchievements(readAchievements());
     setStudyActivity(readStudyActivity());
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("learnx_feynman_scores");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const scores: Record<string, number> = {};
+          for (const [key, val] of Object.entries(parsed)) {
+            if (typeof val === "object" && val !== null && "score" in val) {
+              scores[key] = Number((val as { score: number }).score);
+            } else if (typeof val === "number") {
+              scores[key] = val;
+            }
+          }
+          setFeynmanScores(scores);
+        }
+      } catch {
+        // Ignore localStorage parse errors
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -341,6 +377,15 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
         <div role="progressbar" aria-label="Roadmap completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="flex min-w-36 flex-col justify-center rounded-2xl bg-[#f0f7e7] p-5 dark:bg-white/6"><span className="text-3xl font-black">{progress}%</span><span className="mt-1 text-xs font-bold uppercase tracking-wider text-black/40 dark:text-white/45">{completed} of {milestones.length} done</span><div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10"><motion.div animate={{ width: `${progress}%` }} transition={{ duration: 0.45, ease: "easeOut" }} className="h-full rounded-full bg-[#3c7156] dark:bg-[#a9e950]" /></div></div>
       </header>
       <div className="p-4 sm:p-6 md:p-8 lg:p-10">
+        {/* Zero-Dependency SVG Skill-Radar Competency Matrix */}
+        <div className="mb-6 sm:mb-8">
+          <SkillRadarChart
+            totalMilestones={milestones.length}
+            completedMilestoneIndices={completedMilestonePositions}
+            securityFocus={hasSecurityFocus}
+            speedrunMode={Boolean(zenMilestone)}
+          />
+        </div>
         <div className="mb-5 flex flex-col gap-4 sm:mb-7 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-black/45 dark:text-white/45"><Clock3 className="shrink-0" size={16} /> Estimated path: {roadmapState.estimatedDuration}</div>
           <div data-tour="view-switcher" className="inline-flex w-fit rounded-xl border border-black/8 bg-black/[.025] p-1 dark:border-white/10 dark:bg-white/5" role="tablist" aria-label="Roadmap view">
@@ -361,6 +406,35 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold text-black/45 dark:bg-white/8 dark:text-white/45">{item.duration}</span>
                     <button type="button" onClick={(event) => { event.stopPropagation(); setZenMilestone(item); }} className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#3c7156]/15 bg-[#f0f7e7] px-3 py-1 text-xs font-black text-[#28583f] transition hover:-translate-y-0.5 hover:border-[#3c7156]/35 dark:border-[#c8ff65]/20 dark:bg-[#c8ff65]/10 dark:text-[#c8ff65] dark:hover:border-[#c8ff65]/40" aria-label={`Start a focus session for ${item.title}`}><Timer size={13} /> Focus</button>
+                    {(() => {
+                      const score = feynmanScores[item.id] ?? feynmanScores[item.title];
+                      return score !== undefined && score >= 70 ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFeynmanMilestone(item);
+                          }}
+                          className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#b5f23d]/40 bg-[#b5f23d]/15 px-3 py-1 text-xs font-bold text-[#28583f] transition hover:-translate-y-0.5 hover:border-[#b5f23d]/60 dark:text-[#b5f23d]"
+                          aria-label={`Verified: ${score}% Clarity for ${item.title}`}
+                        >
+                          <Check className="size-3 text-[#28583f] dark:text-[#b5f23d]" strokeWidth={3} />
+                          <span>Verified: {score}% Clarity</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFeynmanMilestone(item);
+                          }}
+                          className="relative z-10 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[#b5f23d]/30 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-[#28583f] transition-all hover:bg-[#b5f23d]/15 dark:text-[#b5f23d]"
+                          aria-label={`Feynman technique check for ${item.title}`}
+                        >
+                          <span role="img" aria-label="brain">🧠</span> Feynman Check
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
                 <p className="mt-2 break-words text-sm leading-6 text-black/50 dark:text-white/55">{item.description}</p>
@@ -469,6 +543,20 @@ export function RoadmapTracker({ roadmap, isSharedSnapshot = false, isDemoMode =
         }}
         onMarkDone={() => {
           if (zenMilestone && !zenMilestone.isCompleted) handleToggle(zenMilestone);
+        }}
+      />
+      <FeynmanEvaluatorModal
+        milestone={feynmanMilestone}
+        existingScore={feynmanMilestone ? (feynmanScores[feynmanMilestone.id] ?? feynmanScores[feynmanMilestone.title]) : undefined}
+        onOpenChange={(open) => {
+          if (!open) setFeynmanMilestone(null);
+        }}
+        onVerified={(milestoneId, score) => {
+          setFeynmanScores((prev) => ({
+            ...prev,
+            [milestoneId]: score,
+            ...(feynmanMilestone ? { [feynmanMilestone.title]: score } : {}),
+          }));
         }}
       />
     </section>

@@ -265,7 +265,8 @@ export async function generateRoadmap(
 
   const parsedPrompt = roadmapPromptSchema.safeParse(formData.get("prompt"));
   if (!parsedPrompt.success) {
-    return { success: false, isValidationError: true, error: ROADMAP_PROMPT_ERROR };
+    const error = parsedPrompt.error.issues[0]?.message ?? ROADMAP_PROMPT_ERROR;
+    return { success: false, isValidationError: true, error };
   }
   const prompt = parsedPrompt.data;
   const isAdvanced = formData.get("isAdvanced") === "true";

@@ -2,11 +2,16 @@
 
 import Groq from "groq-sdk";
 import { z } from "zod";
+import { countWords } from "@/lib/roadmap-validation";
 
 const inputSchema = z.object({
   milestoneTitle: z.string().trim().min(1).max(200),
   milestoneDescription: z.string().trim().max(1000),
-  userExplanation: z.string().trim().min(15, "Please write at least 15 characters to explain the concept in your own words."),
+  userExplanation: z
+    .string()
+    .trim()
+    .min(15, "Please write at least 15 characters to explain the concept in your own words.")
+    .refine((val) => countWords(val) <= 100, "Your explanation must be 100 words or fewer."),
 });
 
 const feynmanResponseSchema = z.object({

@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { countWords, truncateToMaxWords } from "@/lib/roadmap-validation";
 import { cn } from "@/lib/utils";
 
 type FeynmanMilestone = {
@@ -56,7 +57,8 @@ export function FeynmanEvaluatorModal({
   const handleVoiceTranscript = useCallback((transcript: string) => {
     setUserExplanation((prev) => {
       const trimmed = prev.trim();
-      return trimmed ? `${trimmed} ${transcript}` : transcript;
+      const combined = trimmed ? `${trimmed} ${transcript}` : transcript;
+      return countWords(combined) > 100 ? truncateToMaxWords(combined, 100) : combined;
     });
   }, []);
 
@@ -69,6 +71,46 @@ export function FeynmanEvaluatorModal({
     onTranscript: handleVoiceTranscript,
     onError: handleVoiceError,
   });
+
+  const wordCount = countWords(userExplanation);
+  const isAtLimit = wordCount >= 100;
+
+  function handleExplanationChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const rawVal = e.target.value;
+    const words = countWords(rawVal);
+    if (words > 100) {
+      const truncated = truncateToMaxWords(rawVal, 100);
+      setUserExplanation(truncated);
+      toast.warning("Maximum limit reached: explanation capped at 100 words.", {
+        id: "feynman-word-limit",
+      });
+    } else {
+      setUserExplanation(rawVal);
+    }
+    if (error) setError(null);
+  }
+
+  function handleExplanationPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const pastedText = e.clipboardData.getData("text");
+    if (!pastedText) return;
+
+    const textarea = e.currentTarget;
+    const selectionStart = textarea.selectionStart ?? 0;
+    const selectionEnd = textarea.selectionEnd ?? 0;
+    const before = userExplanation.slice(0, selectionStart);
+    const after = userExplanation.slice(selectionEnd);
+    const combined = `${before}${pastedText}${after}`;
+
+    if (countWords(combined) > 100) {
+      e.preventDefault();
+      const truncated = truncateToMaxWords(combined, 100);
+      setUserExplanation(truncated);
+      toast.warning("Pasted explanation exceeded the 100-word limit and was trimmed.", {
+        id: "feynman-paste-limit",
+        duration: 4_000,
+      });
+    }
+  }
 
   // Reset modal state whenever the active milestone changes
   useEffect(() => {
@@ -203,16 +245,28 @@ export function FeynmanEvaluatorModal({
                     >
                       Your Plain-English Explanation:
                     </label>
-                    <span
-                      className={cn(
-                        "text-[11px]",
-                        userExplanation.trim().length >= 15
-                          ? "text-[#b5f23d]"
-                          : "text-zinc-400"
-                      )}
-                    >
-                      {userExplanation.trim().length} / 15 chars min
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "text-[11px]",
+                          userExplanation.trim().length >= 15
+                            ? "text-[#b5f23d]"
+                            : "text-zinc-400"
+                        )}
+                      >
+                        {userExplanation.trim().length} / 15 chars min
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 font-mono text-[10px] font-bold transition-all",
+                          isAtLimit
+                            ? "border border-amber-400/40 bg-amber-400/20 text-amber-200"
+                            : "border border-white/10 bg-white/5 text-white/60"
+                        )}
+                      >
+                        {wordCount}/100 words
+                      </span>
+                    </div>
                   </div>
 
                   <div className="relative">
@@ -220,10 +274,8 @@ export function FeynmanEvaluatorModal({
                       id="user-explanation"
                       rows={5}
                       value={userExplanation}
-                      onChange={(e) => {
-                        setUserExplanation(e.target.value);
-                        if (error) setError(null);
-                      }}
+                      onChange={handleExplanationChange}
+                      onPaste={handleExplanationPaste}
                       placeholder="e.g. Think of a Promise like a restaurant buzzer: you order food, get a ticket, and continue chatting until it either vibrates with your meal or alerts you that the kitchen ran out..."
                       className="w-full resize-none rounded-xl border border-white/15 bg-black/40 p-4 pb-12 text-sm leading-relaxed text-white placeholder:text-zinc-500 focus:border-[#b5f23d] focus:outline-none focus:ring-1 focus:ring-[#b5f23d]"
                     />

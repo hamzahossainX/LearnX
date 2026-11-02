@@ -32,7 +32,6 @@ const suggestions = [
 const demoModels = [
   { value: "gemini-3-8-flash", label: "Gemini 3.8 Flash" },
   { value: "chatgpt-5-6-soul", label: "ChatGPT 5.6 Soul" },
-  { value: "claude-5-opus", label: "Claude 5 Opus" },
   { value: "groq-ultra-speed", label: "Groq Ultra-Speed" },
 ] as const;
 

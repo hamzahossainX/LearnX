@@ -95,8 +95,8 @@ Per-learner generation usage lives on `users` as `daily_generation_count` and `l
 Clone the repository and install its dependencies:
 
 ```bash
-git clone https://github.com/hamzahossainX/Ed-tech.git
-cd Ed-tech
+git clone https://github.com/hamzahossainX/LearnX.git
+cd LearnX
 npm install
 ```
 
@@ -137,7 +137,7 @@ for production with `https://your-domain.com/api/auth/callback/github`.
 
 ### GitHub sign-in on Vercel
 
-Deployed at `https://ed-tech-beryl-rho.vercel.app`. To make GitHub sign-in work
+Deployed at `https://thelearnx.vercel.app`. To make GitHub sign-in work
 there:
 
 1. **Set the environment variables in the Vercel project** (Settings →
@@ -146,11 +146,11 @@ there:
    `GITHUB_ID`, `GITHUB_SECRET`, the `GROQ_API_KEY_*` keys, `GEMINI_API_KEY`,
    and `ADMIN_EMAILS`.
 2. **Register the production callback URL** on a GitHub OAuth App:
-   `https://ed-tech-beryl-rho.vercel.app/api/auth/callback/github`, with the
-   homepage URL set to `https://ed-tech-beryl-rho.vercel.app`. GitHub matches
+   `https://thelearnx.vercel.app/api/auth/callback/github`, with the
+   homepage URL set to `https://thelearnx.vercel.app`. GitHub matches
    this exactly, so a trailing slash or an `http://` scheme will fail.
 3. **Leave `AUTH_URL` unset on Vercel**, or set it to
-   `https://ed-tech-beryl-rho.vercel.app`. `trustHost` is enabled, so the origin
+   `https://thelearnx.vercel.app`. `trustHost` is enabled, so the origin
    is detected from the request. Never copy the localhost value into Vercel.
 4. **Redeploy** after adding variables. Vercel bakes them in at build time, so
    existing deployments do not pick them up.
